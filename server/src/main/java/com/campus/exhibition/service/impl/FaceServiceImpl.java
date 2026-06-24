@@ -93,8 +93,8 @@ public class FaceServiceImpl implements FaceService {
                   + "，门槛 " + String.format("%.2f", qualityThreshold) + "）");
         }
 
-        // 特征 float[] → byte[] → AES 加密
-        byte[] rawBytes = floatsToBytes(data.getFeature());
+        // 特征 base64 → byte[] → AES 加密
+        byte[] rawBytes = Base64.getDecoder().decode(data.getFeature());
         byte[] encrypted = encrypt(rawBytes);
 
         // 保存/更新 face_feature
@@ -162,13 +162,13 @@ public class FaceServiceImpl implements FaceService {
                     .alumni(null).timeline(List.of()).build();
         }
 
-        // 构建 /match 请求（解密特征）
+        // 构建 /match 请求（解密特征 → base64 编码传输）
         List<FaceMatchRequest.Candidate> candidates;
         try {
             candidates = features.stream()
                     .map(f -> FaceMatchRequest.Candidate.builder()
                             .alumniId(f.getAlumniId())
-                            .feature(bytesToFloats(decrypt(f.getFeature())))
+                            .feature(Base64.getEncoder().encodeToString(decrypt(f.getFeature())))
                             .build())
                     .collect(Collectors.toList());
         } catch (Exception e) {
@@ -354,29 +354,4 @@ public class FaceServiceImpl implements FaceService {
         recogLogMapper.insert(logEntity);
     }
 
-    private byte[] floatsToBytes(List<Float> floats) {
-        if (floats == null) return new byte[0];
-        byte[] bytes = new byte[floats.size() * 4];
-        for (int i = 0; i < floats.size(); i++) {
-            int bits = Float.floatToIntBits(floats.get(i));
-            bytes[i * 4]     = (byte) (bits >> 24);
-            bytes[i * 4 + 1] = (byte) (bits >> 16);
-            bytes[i * 4 + 2] = (byte) (bits >> 8);
-            bytes[i * 4 + 3] = (byte) bits;
-        }
-        return bytes;
-    }
-
-    private List<Float> bytesToFloats(byte[] bytes) {
-        if (bytes == null || bytes.length == 0) return List.of();
-        List<Float> floats = new ArrayList<>(bytes.length / 4);
-        for (int i = 0; i < bytes.length; i += 4) {
-            int bits = ((bytes[i] & 0xFF) << 24)
-                     | ((bytes[i + 1] & 0xFF) << 16)
-                     | ((bytes[i + 2] & 0xFF) << 8)
-                     | (bytes[i + 3] & 0xFF);
-            floats.add(Float.intBitsToFloat(bits));
-        }
-        return floats;
-    }
 }

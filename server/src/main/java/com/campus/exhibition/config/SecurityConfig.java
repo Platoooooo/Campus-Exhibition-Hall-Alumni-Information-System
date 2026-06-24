@@ -40,6 +40,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/screen/**").permitAll()
                 // 大屏人脸识别匿名
                 .requestMatchers("/api/face/recognize").permitAll()
+                // 上传文件公开访问
+                .requestMatchers("/uploads/**").permitAll()
                 // 健康检查公开
                 .requestMatchers("/actuator/health").permitAll()
                 // OPTIONS 预检放行

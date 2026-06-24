@@ -3,8 +3,6 @@ package com.campus.exhibition.dto.face;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
-import java.util.List;
-
 /**
  * face-service /extract 响应（契约字段名精确匹配）
  */
@@ -21,7 +19,8 @@ public class FaceExtractResponse {
     public static class ExtractData {
         private boolean faceFound;
         private int faceCount;
-        private List<Float> feature;
+        /** base64 编码的二进制特征（ArcSoft SDK 原始数据，不可转为 float） */
+        private String feature;
         private int dim;
         private Float quality;
         private String modelVer;

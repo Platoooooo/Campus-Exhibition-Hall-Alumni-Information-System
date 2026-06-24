@@ -20,6 +20,7 @@ public class FaceMatchRequest {
     @Builder
     public static class Candidate {
         private long alumniId;
-        private List<Float> feature;
+        /** base64 编码的二进制特征（ArcSoft SDK 原始数据） */
+        private String feature;
     }
 }
