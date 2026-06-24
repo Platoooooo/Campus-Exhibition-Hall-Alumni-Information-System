@@ -1,0 +1,22 @@
+html, body, #app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'HarmonyOS_SansSC_Regular', 'Microsoft YaHei', sans-serif;
+  background: #F5F7FB;
+  color: #1D2129;
+}
+
+/* Element Plus 主色覆写 */
+:root {
+  --el-color-primary: #2B5AED;
+  --el-color-primary-light-3: #5B7EF0;
+  --el-color-primary-light-5: #8CA3F4;
+  --el-color-primary-light-7: #BAC9F8;
+  --el-color-primary-light-8: #D6E0FB;
+  --el-color-primary-light-9: #EDF1FD;
+  --el-color-primary-dark-2: #2248C4;
+  --el-color-success: #36C5A6;
+  --el-color-warning: #F5A623;
+  --el-color-danger: #E5484D;
+}
