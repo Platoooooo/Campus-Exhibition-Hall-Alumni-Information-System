@@ -108,7 +108,7 @@ _h_engine = None
 
 
 def get_dll():
-    global _arc_dll
+    global _arc_dll, _h_engine
     if _arc_dll is not None:
         return _arc_dll
 

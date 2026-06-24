@@ -67,7 +67,11 @@
       "Bash(git init *)",
       "Bash(git remote *)",
       "Bash(git add *)",
-      "Bash(grep -E \"\\(server/target|server/uploads|face-service.log|docker/.env$\\)\")"
+      "Bash(grep -E \"\\(server/target|server/uploads|face-service.log|docker/.env$\\)\")",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(git ls-tree *)",
+      "Bash(git branch *)"
     ]
   }
 }
