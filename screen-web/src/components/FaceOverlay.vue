@@ -6,9 +6,9 @@ import { recognize } from '@/api/face'
 const store = useScreenStore()
 
 // ---- 配置 ----
-const CAPTURE_INTERVAL = 3000   // 抓帧间隔 ms（缩短以提升响应速度）
-const MISS_DISPLAY_MS = 3500    // 未命中提示时长
-const HIT_INTRO_MS = 4000       // "欢迎"过场时长
+const CAPTURE_INTERVAL = 3000   // 抓帧间隔 ms
+const HIT_INTRO_MS = 2500       // 命中卡片展示时长（不遮挡轮播）
+const HIT_MAX_MS = 20000        // 命中后最长展示时间（超时强制恢复默认）
 
 // 摄像头配置（环境变量可覆盖）
 const CAMERA_FACING_MODE = import.meta.env.VITE_CAMERA_FACING_MODE || 'environment'
@@ -23,9 +23,9 @@ const cameraLabel = ref('')    // 当前使用的摄像头名称
 
 let stream = null
 let captureTimer = null
-let missTimer = null
 let hitTimer = null
 let isRecognizing = false       // 防止并发 API 调用
+let recognitionPaused = false   // 命中后暂停识别，等 timeline 播完再恢复
 
 // ---- 扫描动画文本 ----
 const scanDots = ref('')
@@ -91,7 +91,6 @@ async function startCamera() {
 
 function stopCamera() {
   clearInterval(captureTimer)
-  clearTimeout(missTimer)
   clearTimeout(hitTimer)
   if (stream) {
     stream.getTracks().forEach(t => t.stop())
@@ -114,12 +113,11 @@ function captureFrame() {
 
 function scheduleCapture() {
   captureTimer = setInterval(async () => {
-    if (isRecognizing) return  // 上一次识别未完成，跳过本轮
+    if (isRecognizing || recognitionPaused) return
     const frame = captureFrame()
     if (!frame) return
 
     isRecognizing = true
-    const prevState = store.faceState
     store.setFaceState('scanning')
     scanDots.value = ''
 
@@ -127,43 +125,17 @@ function scheduleCapture() {
       const result = await recognize(frame, 'screen-01')
 
       if (result.status === 'HIT') {
-        // 命中：更新数据。若已在 hit 态则平滑切换（递增 hitVersion 触发 carousel 重播）
+        // 命中：展示卡片，暂停后续识别，等 timeline 播完再恢复
         store.onFaceHit(result.alumni, result.timeline)
-        // 重置自动恢复计时
+        recognitionPaused = true
         resetHitTimer()
-      } else if (result.status === 'DEGRADED') {
-        // HIT 态下忽略降级，保持当前展示
-        if (prevState !== 'hit') {
-          store.onFaceMiss('degraded')
-          missTimer = setTimeout(() => {
-            if (store.faceState === 'degraded') store.resetFace()
-          }, MISS_DISPLAY_MS)
-        } else {
-          store.setFaceState('hit')
-        }
-      } else {
-        // NO_MATCH：HIT 态下忽略，保持当前展示
-        if (prevState !== 'hit') {
-          store.onFaceMiss('miss')
-          missTimer = setTimeout(() => {
-            if (store.faceState === 'miss') store.resetFace()
-          }, MISS_DISPLAY_MS)
-        } else {
-          store.setFaceState('hit')
-        }
       }
+      // MISS / DEGRADED / 其他：静默回到 idle，不弹任何负向通知
     } catch {
-      // 网络异常：HIT 态下忽略
-      if (prevState !== 'hit') {
-        store.onFaceMiss('degraded')
-        missTimer = setTimeout(() => {
-          if (store.faceState === 'degraded') store.resetFace()
-        }, MISS_DISPLAY_MS)
-      } else {
-        store.setFaceState('hit')
-      }
+      // 网络异常：静默忽略
     } finally {
       isRecognizing = false
+      if (store.faceState === 'scanning') store.resetFace()
     }
   }, CAPTURE_INTERVAL)
 }
@@ -183,18 +155,38 @@ watch(() => store.faceState, (state) => {
   }
 })
 
-// ---- HIT 过场倒计时（可重置：新人识别后重新计时） ----
+// ---- HIT 过场倒计时（可重置：新人识别后重新计时，最多 HIT_MAX_MS） ----
 function resetHitTimer() {
   clearTimeout(hitTimer)
+  const cycleTime = (store.hitTimeline.length || 1) * (store.carouselData?.intervalSec || 8) * 1000
+  const capped = Math.min(HIT_INTRO_MS + cycleTime, HIT_MAX_MS)
   hitTimer = setTimeout(() => {
     store.resetFace()
-  }, HIT_INTRO_MS + (store.hitTimeline.length || 3) * (store.carouselData?.intervalSec || 8) * 1000)
+  }, capped)
 }
 
 // 命中时启动计时
 watch(() => store.faceState, (state) => {
   if (state === 'hit') {
     resetHitTimer()
+  }
+})
+
+// 摄像头断开时强制恢复默认
+watch(cameraOk, (ok) => {
+  if (!ok) {
+    recognitionPaused = false
+    clearTimeout(hitTimer)
+    if (store.faceState !== 'idle') store.resetFace()
+  } else {
+    recognitionPaused = false
+  }
+})
+
+// timeline 播放完毕 → 恢复识别
+watch(() => store.faceState, (state) => {
+  if (state === 'idle') {
+    recognitionPaused = false
   }
 })
 
@@ -226,49 +218,28 @@ onUnmounted(() => {
       </div>
     </Transition>
 
-    <!-- ════ 扫描态：中央扫描环 ════ -->
+    <!-- ════ 扫描态：右下角小指示器，不影响大屏播放 ════ -->
     <Transition name="face-fade">
       <div v-if="store.faceState === 'scanning'" class="face-scanning">
-        <div class="scan-ring">
-          <div class="scan-ring-inner" />
-          <div class="scan-arc" />
-        </div>
-        <p class="scan-text">正在识别{{ scanDots }}</p>
+        <span class="scan-dot" />
+        <span class="scan-label">识别中{{ scanDots }}</span>
       </div>
     </Transition>
 
-    <!-- ════ 未命中/降级提示 ════ -->
-    <Transition name="face-fade">
-      <div v-if="store.faceState === 'miss' || store.faceState === 'degraded'" class="face-miss">
-        <span v-if="store.faceState === 'miss'" class="miss-icon">🙂</span>
-        <span v-else class="miss-icon">🔌</span>
-        <p class="miss-text" v-if="store.faceState === 'miss'">
-          未识别到您，继续浏览吧
-        </p>
-        <p class="miss-text" v-else>
-          服务暂不可用
-        </p>
-      </div>
-    </Transition>
-
-    <!-- ════ 命中过场 ════ -->
-    <Transition name="face-fade">
-      <div v-if="store.faceState === 'hit'" class="face-hit">
-        <div class="hit-particles">
-          <div v-for="i in 8" :key="i" class="hit-particle" :style="{
-            animationDelay: `${i * 0.15}s`,
-            left: `${40 + Math.cos(i * Math.PI / 4) * 160}px`,
-            top: `${40 + Math.sin(i * Math.PI / 4) * 160}px`
-          }" />
-        </div>
-        <div class="hit-avatar" v-if="store.hitAlumni?.avatar">
+    <!-- ════ 命中卡片：右侧滑入，不遮挡轮播 ════ -->
+    <Transition name="hit-slide">
+      <div v-if="store.faceState === 'hit'" class="face-hit-card">
+        <div class="hit-card-avatar" v-if="store.hitAlumni?.avatar">
           <img :src="store.hitAlumni.avatar" :alt="store.hitAlumni.name" />
         </div>
-        <div class="hit-avatar-placeholder" v-else>
+        <div class="hit-card-avatar hit-card-placeholder" v-else>
           {{ (store.hitAlumni?.name || '?')[0] }}
         </div>
-        <h2 class="hit-welcome">欢迎，{{ store.hitAlumni?.name || '' }}！</h2>
-        <p class="hit-sub">{{ store.hitAlumni?.collegeName }} · {{ store.hitAlumni?.gradYear }}届</p>
+        <div class="hit-card-info">
+          <span class="hit-card-name">{{ store.hitAlumni?.name || '' }}</span>
+          <span class="hit-card-meta">{{ store.hitAlumni?.collegeName }} · {{ store.hitAlumni?.gradYear }}届</span>
+        </div>
+        <div class="hit-card-badge">已识别</div>
       </div>
     </Transition>
   </div>
@@ -332,135 +303,92 @@ onUnmounted(() => {
   user-select: none;
 }
 
-/* ════ 扫描态 ════ */
+/* ════ 扫描态：右下角小指示器 ════ */
 .face-scanning {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  background: rgba(10, 19, 38, 0.7);
-}
-
-.scan-ring {
-  position: relative;
-  width: 200px; height: 200px;
-}
-
-.scan-ring-inner {
-  position: absolute;
-  inset: 20px;
-  border-radius: 50%;
-  border: 3px solid rgba(30, 139, 255, 0.3);
-  animation: ring-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes ring-pulse {
-  0%, 100% { transform: scale(0.8); opacity: 0.3; }
-  50% { transform: scale(1); opacity: 1; }
-}
-
-.scan-arc {
-  position: absolute; inset: 0;
-  border-radius: 50%;
-  border: 3px solid transparent;
-  border-top-color: #1E8BFF;
-  animation: arc-spin 2s linear infinite;
-  filter: drop-shadow(0 0 8px rgba(30, 139, 255, 0.6));
-}
-
-@keyframes arc-spin { to { transform: rotate(360deg); } }
-
-.scan-text {
-  font-family: 'HarmonyOS_SansSC_Bold', sans-serif;
-  font-size: 20px; color: #EAF2FF;
-  margin-top: 32px; letter-spacing: 4px;
-}
-
-/* ════ 未命中 ════ */
-.face-miss {
   position: absolute; bottom: 30px; right: 30px;
-  display: flex; align-items: center; gap: 10px;
-  padding: 14px 22px;
-  background: rgba(10, 19, 38, 0.9);
-  border: 1px solid rgba(254, 215, 102, 0.3);
-  border-radius: 16px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  background: rgba(10, 19, 38, 0.75);
+  border: 1px solid rgba(30, 139, 255, 0.2);
+  border-radius: 20px;
   backdrop-filter: blur(8px);
 }
 
-.miss-icon { font-size: 24px; }
-
-.miss-text {
-  font-size: 13px; color: #93A7C9; margin: 0;
-}
-
-/* ════ 命中过场 ════ */
-.face-hit {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  background: rgba(10, 19, 38, 0.9);
-}
-
-.hit-particles {
-  position: relative;
-  width: 360px; height: 360px;
-  margin-bottom: -280px;
-}
-
-.hit-particle {
-  position: absolute;
-  width: 8px; height: 8px;
+.scan-dot {
+  width: 10px; height: 10px;
   border-radius: 50%;
-  background: #E6B450;
-  box-shadow: 0 0 12px rgba(230, 180, 80, 0.8);
-  animation: particle-converge 1.2s ease-out forwards;
+  background: #1E8BFF;
+  box-shadow: 0 0 10px rgba(30, 139, 255, 0.5);
+  animation: scan-blink 0.8s ease-in-out infinite;
 }
 
-@keyframes particle-converge {
-  0% { transform: scale(1); }
-  50% { transform: scale(2.5); opacity: 1; }
-  100% { transform: scale(0); opacity: 0; }
+@keyframes scan-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.7); }
 }
 
-.hit-avatar {
-  width: 120px; height: 120px;
+.scan-label {
+  font-size: 12px; color: rgba(234, 242, 255, 0.7);
+  user-select: none;
+}
+
+/* ════ 命中卡片：右侧滑入，不遮挡轮播 ════ */
+.face-hit-card {
+  position: absolute; top: 80px; right: 30px;
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 20px;
+  background: rgba(10, 19, 38, 0.9);
+  border: 1px solid rgba(230, 180, 80, 0.4);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(230, 180, 80, 0.15);
+  max-width: 340px;
+  pointer-events: none;
+}
+
+.hit-card-avatar {
+  width: 56px; height: 56px;
   border-radius: 50%;
   overflow: hidden;
-  border: 3px solid #E6B450;
-  box-shadow: 0 0 40px rgba(230, 180, 80, 0.5);
-  margin-bottom: 24px;
-  animation: hit-bounce 0.6s ease-out;
+  border: 2px solid #E6B450;
+  flex-shrink: 0;
 }
 
-@keyframes hit-bounce {
-  0% { transform: scale(0.3); opacity: 0; }
-  60% { transform: scale(1.1); }
-  100% { transform: scale(1); opacity: 1; }
-}
+.hit-card-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-.hit-avatar img { width: 100%; height: 100%; object-fit: cover; }
-
-.hit-avatar-placeholder {
-  width: 120px; height: 120px;
-  border-radius: 50%;
-  background: rgba(30, 139, 255, 0.2);
+.hit-card-placeholder {
   display: flex; align-items: center; justify-content: center;
+  background: rgba(230, 180, 80, 0.15);
   font-family: 'HarmonyOS_SansSC_Bold', sans-serif;
-  font-size: 48px; color: #1E8BFF;
-  border: 3px solid rgba(30, 139, 255, 0.4);
-  margin-bottom: 24px;
-  animation: hit-bounce 0.6s ease-out;
+  font-size: 24px; color: #E6B450;
+  border-color: rgba(230, 180, 80, 0.4);
 }
 
-.hit-welcome {
-  font-family: 'HarmonyOS_SansSC_Bold', sans-serif;
-  font-size: 42px; color: #EAF2FF;
-  margin: 0 0 8px; letter-spacing: 4px;
-  animation: hit-bounce 0.6s ease-out 0.1s both;
+.hit-card-info {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
 }
 
-.hit-sub {
-  font-size: 18px; color: #93A7C9;
-  margin: 0;
-  animation: hit-bounce 0.6s ease-out 0.2s both;
+.hit-card-name {
+  font-family: 'HarmonyOS_SansSC_Bold', sans-serif;
+  font-size: 18px; color: #EAF2FF;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+.hit-card-meta {
+  font-size: 12px; color: #93A7C9;
+}
+
+.hit-card-badge {
+  font-size: 10px; color: #E6B450;
+  border: 1px solid rgba(230, 180, 80, 0.3);
+  border-radius: 10px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+
+/* 卡片滑入/滑出动画 */
+.hit-slide-enter-active { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.hit-slide-leave-active { transition: all 0.3s ease-in; }
+.hit-slide-enter-from { opacity: 0; transform: translateX(60px); }
+.hit-slide-leave-to { opacity: 0; transform: translateX(60px); }
 </style>

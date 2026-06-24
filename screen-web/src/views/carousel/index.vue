@@ -53,6 +53,7 @@ const currentMedia = computed(() => {
 
 // ---- 轮播控制 ----
 let autoTimer = null
+let autoPlayPausedByHit = false   // 标记：是否被人脸命中暂停（防止识别循环重置定时器）
 const intervalMs = computed(() => (store.carouselData?.intervalSec || 8) * 1000)
 
 function nextSlide() {
@@ -103,14 +104,26 @@ watch(intervalMs, () => {
   startAutoPlay()
 })
 
-// ---- 人脸命中 → 播放专属 timeline ----
+// ---- 人脸命中 → 播放专属 timeline（最多 2 轮） ----
+let hitCycleCount = 0
+const MAX_HIT_CYCLES = 2
+
 function startHitTimeline() {
   stopHitTimeline()
   hitTimelineIndex.value = 0
+  hitCycleCount = 0
   if (hitTimelineLen.value <= 1) return
   const ival = (store.carouselData?.intervalSec || 8) * 1000
   hitAdvanceTimer = setInterval(() => {
     hitTimelineIndex.value = (hitTimelineIndex.value + 1) % hitTimelineLen.value
+    // 回到索引 0 表示完成一轮
+    if (hitTimelineIndex.value === 0) {
+      hitCycleCount++
+      if (hitCycleCount >= MAX_HIT_CYCLES) {
+        stopHitTimeline()
+        store.resetFace()
+      }
+    }
   }, ival)
 }
 
@@ -119,16 +132,21 @@ function stopHitTimeline() {
     clearInterval(hitAdvanceTimer)
     hitAdvanceTimer = null
   }
+  hitCycleCount = 0
 }
 
 watch([() => store.faceState, () => store.hitVersion], ([state]) => {
   if (state === 'hit') {
     stopAutoPlay()
     stopHitTimeline()
-    // 短暂延迟等过场动画播放后开始 timeline
-    setTimeout(() => startHitTimeline(), 3500)
-  } else if (state === 'idle') {
+    autoPlayPausedByHit = true
+    // 短暂延迟等命中卡片展示后开始 timeline（与 HIT_INTRO_MS 对齐）
+    setTimeout(() => startHitTimeline(), 2000)
+  } else if (state === 'idle' && autoPlayPausedByHit) {
+    // 仅当之前是被人脸命中暂停的，才恢复自动轮播
+    // 避免人脸识别循环（scanning → idle 每 3s 一次）反复重置定时器
     stopHitTimeline()
+    autoPlayPausedByHit = false
     startAutoPlay()
   }
 })
