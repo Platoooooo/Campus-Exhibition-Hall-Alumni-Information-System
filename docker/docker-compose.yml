@@ -67,6 +67,57 @@ services:
     networks:
       - exhibition-net
 
+  # ============= Spring Boot 后端 =============
+  server:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    container_name: exhibition-server
+    restart: always
+    ports:
+      - "127.0.0.1:${SERVER_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis123}
+      FACE_ENCRYPT_KEY: ${FACE_ENCRYPT_KEY:-change-me-in-production}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - exhibition-net
+
+  # ============= 管理后台（Vue3 + Nginx） =============
+  admin-web:
+    build:
+      context: ../admin-web
+      dockerfile: Dockerfile
+    container_name: exhibition-admin
+    restart: always
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-8081}:80"
+    depends_on:
+      - server
+    networks:
+      - exhibition-net
+
+  # ============= 大屏展示端（Vue3 + Nginx） =============
+  screen-web:
+    build:
+      context: ../screen-web
+      dockerfile: Dockerfile
+    container_name: exhibition-screen
+    restart: always
+    ports:
+      - "127.0.0.1:${SCREEN_PORT:-8082}:80"
+    depends_on:
+      - server
+    networks:
+      - exhibition-net
+
 networks:
   exhibition-net:
     driver: bridge
