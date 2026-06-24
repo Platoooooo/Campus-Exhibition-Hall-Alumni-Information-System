@@ -196,7 +196,8 @@ app = FastAPI(
 
 
 # ============================================================
-# 请求 / 响应模型（与 Java DTO 对齐：feature 为 List[float]）
+# 请求 / 响应模型（feature 为 base64 编码的二进制特征，与 Java DTO String 对齐）
+# ArcSoft SDK 特征向量是不透明二进制 blob，不可转为 float（含 NaN 会导致 JSON 崩溃）
 # ============================================================
 
 class ExtractRequest(BaseModel):
@@ -206,7 +207,7 @@ class ExtractRequest(BaseModel):
 
 class CandidateItem(BaseModel):
     alumniId: int
-    feature: List[float] = Field(..., description="float 数组格式的特征向量")
+    feature: str = Field(..., description="base64 编码的特征（二进制 blob）")
 
 
 class MatchRequest(BaseModel):
@@ -218,8 +219,8 @@ class MatchRequest(BaseModel):
 class ExtractData(BaseModel):
     faceFound: bool
     faceCount: int
-    feature: Optional[List[float]] = None   # float 数组，与 Java DTO List<Float> 对齐
-    dim: int = 0                             # 特征向量维度（float 个数）
+    feature: Optional[str] = None    # base64 编码的二进制特征
+    dim: int = 0                      # 特征字节数
     quality: Optional[float] = None
     modelVer: str = "arcsoft-v3.0"
 
@@ -246,18 +247,8 @@ class MatchResponse(BaseModel):
 
 
 # ============================================================
-# 特征序列化辅助（bytes ↔ List[float]，与 Java floatsToBytes/bytesToFloats 对齐）
+# 特征序列化（base64 编码 — 保持二进制完整性，NaN/Inf 安全）
 # ============================================================
-
-def _bytes_to_floats(data: bytes) -> List[float]:
-    """将 ArcSoft 原始特征字节 → float 列表（大端序，4 字节/float）"""
-    count = len(data) // 4
-    return list(struct.unpack(f">{count}f", data))
-
-
-def _floats_to_bytes(floats: List[float]) -> bytes:
-    """float 列表 → 原始字节（大端序，与 Java floatsToBytes 一致）"""
-    return struct.pack(f">{len(floats)}f", *floats)
 
 
 # ============================================================
@@ -386,21 +377,21 @@ def _extract_feature_raw(image_bytes: bytes) -> Optional[bytes]:
     return feat_bytes
 
 
-def _extract_feature(image_bytes: bytes) -> Optional[List[float]]:
-    """提取特征 → 返回 float 列表（对齐 Java DTO）"""
+def _extract_feature(image_bytes: bytes) -> Optional[str]:
+    """提取特征 → 返回 base64 编码的二进制（保持 ArcSoft 原始数据完整性）"""
     raw = _extract_feature_raw(image_bytes)
     if raw is None:
         return None
-    return _bytes_to_floats(raw)
+    return base64.b64encode(raw).decode("ascii")
 
 
-def _compare_features(feat1: List[float], feat2: List[float]) -> float:
-    """比对两个 float 列表特征 → 返回置信度 0~1"""
+def _compare_features(feat1_b64: str, feat2_b64: str) -> float:
+    """比对两个 base64 编码的特征 → 返回置信度 0~1"""
     dll = get_dll()
     engine = get_engine()
 
-    raw1 = _floats_to_bytes(feat1)
-    raw2 = _floats_to_bytes(feat2)
+    raw1 = base64.b64decode(feat1_b64)
+    raw2 = base64.b64decode(feat2_b64)
 
     f1 = ASF_FaceFeature()
     f1.feature = cast(
@@ -446,7 +437,8 @@ async def health():
 async def extract(req: ExtractRequest):
     image_bytes = _decode_image(req.image)
     import sys
-    print(f"[extract] decoded {len(image_bytes)} bytes ({len(req.image)} b64 chars)", flush=True)
+    raw_size = len(image_bytes)
+    print(f"[extract] decoded {raw_size} bytes ({len(req.image)} b64 chars)", flush=True)
 
     face_count, face_info = _detect_faces(image_bytes)
     print(f"[extract] detect result: faceCount={face_count}", flush=True)
@@ -455,19 +447,21 @@ async def extract(req: ExtractRequest):
         return ExtractResponse(data=ExtractData(
             faceFound=False, faceCount=0, feature=None, dim=0, quality=None))
 
-    features = _extract_feature(image_bytes)
-    if features is None:
+    feature_b64 = _extract_feature(image_bytes)
+    if feature_b64 is None:
         print(f"[extract] feature extraction failed (face detected but extract returned None)", flush=True)
         return ExtractResponse(data=ExtractData(
             faceFound=False, faceCount=face_count, feature=None, dim=0,
             quality=None))
 
-    print(f"[extract] OK: dim={len(features)}", flush=True)
+    # dim = 原始二进制字节数（base64 解码后的长度）
+    raw_feat = base64.b64decode(feature_b64)
+    print(f"[extract] OK: rawDim={len(raw_feat)}, b64Len={len(feature_b64)}", flush=True)
     return ExtractResponse(data=ExtractData(
         faceFound=True,
         faceCount=face_count,
-        feature=features,
-        dim=len(features),
+        feature=feature_b64,
+        dim=len(raw_feat),
         quality=None,  # ArcSoft SDK free version 不返回质量分
     ))
 
