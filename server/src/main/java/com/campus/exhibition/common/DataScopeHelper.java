@@ -1,6 +1,7 @@
 package com.campus.exhibition.common;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.campus.exhibition.enums.RoleEnum;
 
 /**
@@ -27,18 +28,14 @@ public final class DataScopeHelper {
      * @param <T>           实体类型
      */
     public static <T> void applyCollegeScope(LambdaQueryWrapper<T> wrapper,
-                                             java.util.function.Function<T, ?> collegeColumn) {
+                                             SFunction<T, ?> collegeColumn) {
         String role = UserContext.role();
         if (role == null) return;
 
         if (RoleEnum.COLLEGE.getCode().equals(role)) {
             Long collegeId = UserContext.collegeId();
             if (collegeId != null) {
-                // 通过 SFunction 获取字段名
-                @SuppressWarnings("unchecked")
-                com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> func =
-                        (com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?>) collegeColumn;
-                wrapper.eq(func, collegeId);
+                wrapper.eq(collegeColumn, collegeId);
             }
         }
         // academic 和 admin 不限制

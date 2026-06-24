@@ -10,6 +10,7 @@ import com.campus.exhibition.enums.ArchiveStatus;
 import com.campus.exhibition.mapper.*;
 import com.campus.exhibition.service.OperationService;
 import com.campus.exhibition.vo.*;
+import com.github.benmanes.caffeine.cache.Cache;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,10 @@ public class OperationServiceImpl implements OperationService {
     private final ArchiveMediaMapper mediaMapper;
     private final ScreenCarouselMapper carouselMapper;
     private final ScreenCarouselItemMapper carouselItemMapper;
+    private final Cache<String, Object> screenCache;
+
+    /** 轮播缓存 key，与大屏接口一致 */
+    private static final String CAROUSEL_CACHE_KEY = "carousel:default";
 
     /* ========== 上架/下架 ========== */
 
@@ -45,6 +50,7 @@ public class OperationServiceImpl implements OperationService {
         archive.setStatus(ArchiveStatus.PUBLISHED.getCode());
         archive.setPublishTime(LocalDateTime.now());
         archiveMapper.updateById(archive);
+        evictCarouselCache();
         return toArchiveVO(archive);
     }
 
@@ -57,6 +63,7 @@ public class OperationServiceImpl implements OperationService {
         }
         archive.setStatus(ArchiveStatus.UNPUBLISHED.getCode());
         archiveMapper.updateById(archive);
+        evictCarouselCache();
         return toArchiveVO(archive);
     }
 
@@ -107,6 +114,7 @@ public class OperationServiceImpl implements OperationService {
         if (entity.getIsDefault() == null) entity.setIsDefault(0);
         entity.setStatus(1);
         carouselMapper.insert(entity);
+        evictCarouselCache();
         return toCarouselVO(entity);
     }
 
@@ -123,6 +131,7 @@ public class OperationServiceImpl implements OperationService {
 
         BeanUtils.copyProperties(request, entity);
         carouselMapper.updateById(entity);
+        evictCarouselCache();
         return toCarouselVO(entity);
     }
 
@@ -135,6 +144,7 @@ public class OperationServiceImpl implements OperationService {
         carouselItemMapper.delete(
                 new LambdaQueryWrapper<ScreenCarouselItem>().eq(ScreenCarouselItem::getCarouselId, id));
         carouselMapper.deleteById(id);
+        evictCarouselCache();
     }
 
     @Override
@@ -168,6 +178,7 @@ public class OperationServiceImpl implements OperationService {
         item.setAlumniId(request.getAlumniId());
         item.setSort(request.getSort() != null ? request.getSort() : 999);
         carouselItemMapper.insert(item);
+        evictCarouselCache();
 
         return toCarouselVO(carouselMapper.selectById(carouselId));
     }
@@ -179,6 +190,7 @@ public class OperationServiceImpl implements OperationService {
         if (item == null || !item.getCarouselId().equals(carouselId))
             throw new BizException(ErrorCode.NOT_FOUND, "轮播项不存在");
         carouselItemMapper.deleteById(itemId);
+        evictCarouselCache();
     }
 
     @Override
@@ -191,9 +203,15 @@ public class OperationServiceImpl implements OperationService {
                 carouselItemMapper.updateById(item);
             }
         }
+        evictCarouselCache();
     }
 
     /* ========== 内部方法 ========== */
+
+    /** 清除大屏轮播缓存，使运营修改即时生效 */
+    private void evictCarouselCache() {
+        screenCache.invalidate(CAROUSEL_CACHE_KEY);
+    }
 
     private void clearDefaultCarousel() {
         List<ScreenCarousel> defaults = carouselMapper.selectList(

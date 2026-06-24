@@ -54,6 +54,8 @@ app:
     quality-threshold: 0.6
     encrypt-key: ${FACE_ENCRYPT_KEY:change-me-in-production}
     store-original-image: false
+  cache:
+    screen-carousel-ttl-minutes: ${SCREEN_CACHE_TTL:5}  # 大屏轮播缓存 TTL（分钟），设为 0 则禁用缓存
   jwt:
     secret: ${JWT_SECRET:change-me-in-production-use-256-bit-key}
     expiration-ms: 86400000

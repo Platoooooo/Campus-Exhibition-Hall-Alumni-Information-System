@@ -185,6 +185,8 @@ public class AuditServiceImpl implements AuditService {
     }
 
     private void checkCollegeScope(Archive archive) {
+        // 校级管理员不受学院限制
+        if (RoleEnum.ADMIN.getCode().equals(UserContext.role())) return;
         Long userCollegeId = UserContext.collegeId();
         if (userCollegeId == null || !userCollegeId.equals(archive.getCollegeId())) {
             throw new BizException(ErrorCode.FORBIDDEN, "只能审核本学院资料");
