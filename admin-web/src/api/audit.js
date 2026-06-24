@@ -14,7 +14,7 @@ export function getAuditLogs(archiveId) {
 
 /** 学院审核：通过 */
 export function collegeApprove(archiveId, opinion) {
-  return request.put(`/audit/${archiveId}/college/approve`, opinion ? { opinion } : null).then(res => res.data)
+  return request.put(`/audit/${archiveId}/college/approve`, opinion ? { opinion } : {}).then(res => res.data)
 }
 
 /** 学院审核：驳回 */
@@ -24,7 +24,7 @@ export function collegeReject(archiveId, opinion) {
 
 /** 教务处审核：通过 */
 export function academicApprove(archiveId, opinion) {
-  return request.put(`/audit/${archiveId}/academic/approve`, opinion ? { opinion } : null).then(res => res.data)
+  return request.put(`/audit/${archiveId}/academic/approve`, opinion ? { opinion } : {}).then(res => res.data)
 }
 
 /** 教务处审核：驳回 */

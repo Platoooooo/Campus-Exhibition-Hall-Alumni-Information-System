@@ -232,9 +232,9 @@ async function handleDelete(row) {
 }
 
 // ---- 头像上传 ----
-async function handleAvatarUpload(file) {
+async function handleAvatarUpload(options) {
   try {
-    const result = await uploadFile(file.raw)
+    const result = await uploadFile(options.file)
     form.avatar = result.url
     ElMessage.success('头像上传成功')
   } catch {

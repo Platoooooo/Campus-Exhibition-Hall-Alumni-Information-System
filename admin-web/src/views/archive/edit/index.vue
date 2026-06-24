@@ -10,8 +10,8 @@ import { uploadFile } from '@/api/upload'
 
 const router = useRouter()
 const route = useRoute()
-const editId = route.params.id ? Number(route.params.id) : null
-const isEdit = !!editId
+const editId = computed(() => route.params.id ? Number(route.params.id) : null)
+const isEdit = computed(() => !!editId.value)
 const isDraft = ref(true)    // 当前状态是否可编辑
 const currentStatus = ref('') // 当前档案状态字符串
 
@@ -112,10 +112,10 @@ async function loadDictionaries() {
 }
 
 async function loadArchive() {
-  if (!editId) return
+  if (!editId.value) return
   formLoading.value = true
   try {
-    const data = await getArchiveById(editId)
+    const data = await getArchiveById(editId.value)
     Object.assign(form, {
       title: data.title || '',
       categoryId: data.categoryId ?? null,
@@ -162,8 +162,8 @@ async function handleSave() {
       collegeId: form.collegeId
     }
 
-    if (isEdit) {
-      await updateArchive(editId, payload)
+    if (isEdit.value) {
+      await updateArchive(editId.value, payload)
       ElMessage.success('保存成功')
     } else {
       const created = await createArchive(payload)
@@ -184,11 +184,18 @@ async function handleSubmit() {
       '确认提交',
       { confirmButtonText: '确认', cancelButtonText: '取消', type: 'info' }
     )
-    await submitForReview(editId)
+  } catch {
+    // 用户取消
+    return
+  }
+  try {
+    await submitForReview(editId.value)
     isDraft.value = false
     currentStatus.value = 'pending_college'
     ElMessage.success('已提交审核')
-  } catch { /* 取消 */ }
+  } catch {
+    ElMessage.error('提交失败，请重试')
+  }
 }
 
 // ---- 媒体操作 ----
@@ -216,13 +223,13 @@ function onFileDrop(e) {
 
 /** 上传媒体文件 */
 async function uploadMediaFile(file) {
-  if (!editId) {
+  if (!editId.value) {
     ElMessage.warning('请先保存档案再上传媒体')
     return
   }
   mediaUploading.value = true
   try {
-    const updated = await addMedia(editId, file)
+    const updated = await addMedia(editId.value, file)
     mediaList.value = updated.mediaList || []
     ElMessage.success('上传成功')
   } catch {
@@ -234,12 +241,12 @@ async function uploadMediaFile(file) {
 
 /** 删除媒体 */
 async function handleRemoveMedia(mediaId) {
-  if (!editId) return
+  if (!editId.value) return
   try {
     await ElMessageBox.confirm('确定删除该媒体吗？', '确认', {
       confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'
     })
-    await removeMedia(editId, mediaId)
+    await removeMedia(editId.value, mediaId)
     mediaList.value = mediaList.value.filter(m => m.id !== mediaId)
     ElMessage.success('已删除')
   } catch { /* 取消 */ }

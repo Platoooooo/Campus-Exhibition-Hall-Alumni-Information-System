@@ -25,11 +25,9 @@ const statusLabels = {
 async function loadApprovedArchives() {
   gridLoading.value = true
   try {
-    // 分两次查：已入库 + 已上架 + 已下架
-    const [r1] = await Promise.all([
-      getArchivePage({ status: 'approved', pageNum: 1, pageSize: 200 }),
-    ])
-    approvedList.value = (r1.records || []).filter(
+    // 不加 status 过滤，查全部后在内存中筛选 approved/published/unpublished
+    const res = await getArchivePage({ pageNum: 1, pageSize: 500 })
+    approvedList.value = (res.records || []).filter(
       a => ['approved', 'published', 'unpublished'].includes(a.status)
     )
     // 按 displaySort 排序
@@ -326,23 +324,28 @@ onMounted(() => {
               <h3>轮播方案</h3>
               <el-button size="small" type="primary" @click="openCarouselForm(null)">新建方案</el-button>
             </div>
-            <el-radio-group
-              v-model="selectedCarouselId"
-              style="width:100%;display:flex;flex-direction:column;gap:8px"
-              @change="selectCarousel"
-            >
-              <div v-for="c in carousels" :key="c.id" class="carousel-radio-item">
-                <el-radio :value="c.id" border style="width:100%">
-                  <div class="radio-label">
-                    <span>{{ c.name }}</span>
+            <div class="carousel-list">
+              <div
+                v-for="c in carousels"
+                :key="c.id"
+                class="carousel-card"
+                :class="{ 'is-selected': selectedCarouselId === c.id }"
+                @click="selectCarousel(c.id)"
+              >
+                <div class="card-left">
+                  <span class="card-dot" />
+                  <div class="card-info">
+                    <span class="card-name">{{ c.name }}</span>
                     <el-tag v-if="c.isDefault" size="small" type="success">默认</el-tag>
-                    <span class="radio-meta">{{ c.intervalSec }}s · {{ c.effect }}</span>
                   </div>
-                </el-radio>
-                <el-button link type="primary" size="small" class="radio-edit" @click="openCarouselForm(c)">编辑</el-button>
-                <el-button link type="danger" size="small" @click="handleDeleteCarousel(c.id)">删除</el-button>
+                  <span class="card-meta">{{ c.intervalSec }}s · {{ c.effect }}</span>
+                </div>
+                <div class="card-actions" @click.stop>
+                  <el-button link type="primary" size="small" @click="openCarouselForm(c)">编辑</el-button>
+                  <el-button link type="danger" size="small" @click="handleDeleteCarousel(c.id)">删除</el-button>
+                </div>
               </div>
-            </el-radio-group>
+            </div>
           </div>
 
           <!-- 已发布档案池 -->
@@ -500,12 +503,56 @@ onMounted(() => {
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .panel-header h3 { margin: 0; font-size: 15px; }
 
-.carousel-radio-item {
-  display: flex; align-items: center; gap: 4px;
+/* ---- 轮播方案卡片列表 ---- */
+.carousel-list {
+  display: flex; flex-direction: column; gap: 8px;
 }
-.radio-label { display: flex; gap: 8px; align-items: center; flex: 1; font-size: 13px; }
-.radio-meta { color: #86909C; font-size: 11px; margin-left: auto; }
-.radio-edit { font-size: 12px; }
+
+.carousel-card {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid #E5E6EB; border-radius: 8px;
+  background: #fff; cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.carousel-card:hover {
+  border-color: #2B5AED; box-shadow: 0 1px 6px rgba(43,90,237,0.08);
+}
+.carousel-card.is-selected {
+  border-color: #2B5AED; background: #EDF1FD; box-shadow: 0 1px 6px rgba(43,90,237,0.12);
+}
+
+.card-left {
+  display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;
+}
+
+.card-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #D0D5DD; flex-shrink: 0;
+}
+.carousel-card.is-selected .card-dot {
+  background: #2B5AED; box-shadow: 0 0 0 3px rgba(43,90,237,0.15);
+}
+
+.card-info {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+}
+
+.card-name {
+  font-size: 14px; font-weight: 500; color: #1D2129;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 140px;
+}
+.carousel-card.is-selected .card-name {
+  color: #2B5AED;
+}
+
+.card-meta {
+  color: #86909C; font-size: 11px; flex-shrink: 0; margin-left: auto;
+}
+
+.card-actions {
+  display: flex; gap: 2px; flex-shrink: 0; margin-left: 12px;
+}
 
 /* 已发布档案池 */
 .pool-list { max-height: 320px; overflow-y: auto; }
