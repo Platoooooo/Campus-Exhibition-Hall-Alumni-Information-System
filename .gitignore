@@ -1,0 +1,78 @@
+# ====================
+# IDE & Editor
+# ====================
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# ====================
+# Java / Maven
+# ====================
+/server/target/
+/server/*.jar
+/server/*.war
+
+# ====================
+# Node.js / Vite
+# ====================
+node_modules/
+dist/
+*.local
+
+# ====================
+# Python
+# ====================
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ====================
+# OS & Misc
+# ====================
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.local
+.env.*.local
+
+# ====================
+# Sensitive keys
+# ====================
+key/
+
+# ====================
+# Runtime uploads
+# ====================
+uploads/
+
+# ====================
+# Visual Studio (ArcfaceDemo)
+# ====================
+.vs/
+*.pch
+*.ipch
+[Bb]in/
+[Dd]ebug/
+[Rr]elease/
+x64/
+
+# ====================
+# ArcfaceDemo (standalone VS test project)
+# ====================
+ArcfaceDemo/
+
+# ====================
+# Docker runtime data
+# ====================
+docker/data/
+
+# ====================
+# Native SDK binaries
+# ====================
+face-service/x64/
