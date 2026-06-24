@@ -4,7 +4,5 @@ import request from './request'
 export function uploadFile(file) {
   const formData = new FormData()
   formData.append('file', file)
-  return request.post('/media/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }).then(res => res.data)
+  return request.post('/media/upload', formData).then(res => res.data)
 }

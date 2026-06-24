@@ -91,14 +91,27 @@ async function loadHistory() {
   historyLoading.value = true
   try {
     const { getArchivePage } = await import('@/api/archive')
-    const status = activeTab.value === 'approved' ? 'approved' : 'rejected'
-    const res = await getArchivePage({
-      status,
-      pageNum: historyPage.value,
-      pageSize: pageSize.value
-    })
-    historyList.value = res.records || []
-    historyTotal.value = res.total || 0
+    if (activeTab.value === 'rejected') {
+      // 已驳回：只查 rejected
+      const res = await getArchivePage({
+        status: 'rejected',
+        pageNum: historyPage.value,
+        pageSize: pageSize.value
+      })
+      historyList.value = res.records || []
+      historyTotal.value = res.total || 0
+    } else {
+      // 已通过：查 approved + published + unpublished（审核通过后的所有状态）
+      const res = await getArchivePage({
+        pageNum: 1,
+        pageSize: 500
+      })
+      const filtered = (res.records || []).filter(
+        a => ['approved', 'published', 'unpublished'].includes(a.status)
+      )
+      historyList.value = filtered
+      historyTotal.value = filtered.length
+    }
   } finally {
     historyLoading.value = false
   }

@@ -34,7 +34,5 @@ export function downloadTemplate() {
 export function importExcel(file) {
   const formData = new FormData()
   formData.append('file', file)
-  return request.post('/alumni/import', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }).then(res => res.data)
+  return request.post('/alumni/import', formData).then(res => res.data)
 }

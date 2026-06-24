@@ -29,9 +29,7 @@ export function deleteArchive(id) {
 export function addMedia(archiveId, file) {
   const formData = new FormData()
   formData.append('file', file)
-  return request.post(`/archive/${archiveId}/media`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }).then(res => res.data)
+  return request.post(`/archive/${archiveId}/media`, formData).then(res => res.data)
 }
 
 /** 删除档案媒体 */
