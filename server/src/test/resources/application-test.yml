@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  sql:
+    init:
+      mode: always
+      # 如需集成测试，可在此指定 H2 兼容的建表 SQL
+      # schema-locations: classpath:schema-h2.sql
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+# 人脸服务测试配置
+app:
+  face:
+    service-url: http://localhost:8000
+    quality-threshold: 0.6
+    encrypt-key: test-key-for-crypto-16b
+    store-original-image: false
