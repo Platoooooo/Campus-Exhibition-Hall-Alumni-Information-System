@@ -6,6 +6,16 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.js'],
+    css: {
+      modules: {
+        classNameStrategy: 'non-scoped'
+      }
+    }
+  },
   plugins: [
     vue(),
     AutoImport({
