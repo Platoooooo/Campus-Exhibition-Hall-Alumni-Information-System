@@ -34,8 +34,10 @@ function handleLogout() {
     <!-- 侧边栏 -->
     <el-aside :width="collapsed ? '64px' : '220px'" class="sidebar">
       <div class="logo-area" :class="{ collapsed }">
-        <span class="logo-icon">🏛</span>
-        <span v-show="!collapsed" class="logo-text">校园展览馆</span>
+        <div class="logo-icon-wrap">
+          <img src="@/assets/images/school_badge.png" class="logo-icon" alt="福软校徽" />
+        </div>
+        <span v-show="!collapsed" class="logo-text">福软校友展览馆</span>
       </div>
 
       <el-menu
@@ -124,9 +126,21 @@ function handleLogout() {
   gap: 0;
 }
 
-.logo-icon {
-  font-size: 24px;
+.logo-icon-wrap {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    transparent 70%
+  );
+  display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
+}
+
+.logo-icon {
+  width: 24px; height: 24px;
+  object-fit: contain;
 }
 
 .logo-text {

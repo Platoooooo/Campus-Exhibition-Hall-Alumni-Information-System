@@ -42,8 +42,10 @@ async function handleLogin() {
     <!-- 左侧品牌区域 -->
     <div class="login-left">
       <div class="brand-content">
-        <div class="brand-badge">🏛</div>
-        <h1 class="brand-title">校园展览馆</h1>
+        <div class="brand-badge-wrap">
+          <img src="@/assets/images/school_badge.png" class="brand-badge" alt="福软校徽" />
+        </div>
+        <h1 class="brand-title">福软校友展览馆</h1>
         <p class="brand-subtitle">校友资料管理系统</p>
         <div class="brand-features">
           <span>校友档案数字化</span>
@@ -51,7 +53,7 @@ async function handleLogin() {
           <span>荣誉轨迹展示</span>
         </div>
       </div>
-      <div class="brand-footer">© 2024 校园展览馆 Alumni Archive System</div>
+      <div class="brand-footer">Copyright © 2026 福州软件职业技术学院 陈灿</div>
     </div>
 
     <!-- 右侧登录卡片 -->
@@ -128,9 +130,21 @@ async function handleLogin() {
   color: #fff;
 }
 
+.brand-badge-wrap {
+  width: 100px; height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 70%
+  );
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+}
+
 .brand-badge {
-  font-size: 64px;
-  margin-bottom: 16px;
+  width: 70px; height: 70px;
+  object-fit: contain;
 }
 
 .brand-title {

@@ -92,7 +92,7 @@ const router = createRouter({
 // ---- 全局路由守卫 ----
 router.beforeEach((to, from, next) => {
   // 页面标题
-  document.title = to.meta.title ? `${to.meta.title} · 校园展览馆` : '校园展览馆 · 管理后台'
+  document.title = to.meta.title ? `${to.meta.title} · 福软校友展览馆` : '福软校友展览馆 · 管理后台'
 
   const userStore = useUserStore()
 
