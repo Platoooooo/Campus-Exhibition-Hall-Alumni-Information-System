@@ -150,8 +150,8 @@ pip install -r requirements.txt
 
 # 2. 设置密钥（必填）。密钥在 key/arcface_key.txt
 # Bash / Git Bash:
-export ARCSOFT_APP_ID=AppIdDDSSWB3Ckpep5MU3rmPdxfCRq1WQG8mYBeYzJEMciyW1
-export ARCSOFT_SDK_KEY=9siBDHDr8yEnspg6CkSWbTnUawUwZzyyTvkdWJxbWmBV
+export ARCSOFT_APP_ID=AppIdYOUR_APP_ID   # 从 ArcSoft 官网申请
+export ARCSOFT_SDK_KEY=YOUR_SDK_KEY
 # 可选：识别阈值（默认 0.80，适合生活照；证件照可设 0.82）
 export FACE_THRESHOLD=0.80
 
